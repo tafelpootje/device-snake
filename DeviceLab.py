@@ -23,7 +23,7 @@ con = None
 cur = None
 	
 def databaseQueryOne(query, arguments):
-	con = lite.connect('www/devicelab/data/devicelabdb')
+	con = lite.connect('../devicelab/data/devicelabdb')
 	cur = con.cursor()    
 	cur.execute(query, arguments)
 	result = cur.fetchone()
@@ -31,7 +31,7 @@ def databaseQueryOne(query, arguments):
 	con.close()
 	return result
 def databaseQueryAll(query, arguments):
-	con = lite.connect('www/devicelab/data/devicelabdb')
+	con = lite.connect('../devicelab/data/devicelabdb')
 	cur = con.cursor()    
 	cur.execute(query, arguments)
 	result = cur.fetchall()
@@ -58,38 +58,38 @@ def scanCanBeAny(rfid):
 			userID=rfid
 			lcdMessage = "Please scan the device you need"
 	else:
-		print 4
 		whatToExpect = 1
 		deviceID=rfid
 		lcdMessage = "Please scan id to return device"
 	tag = 0
-	print 12
+	sleep(2)
 
 def scanShouldBeUser (rfid):
 	global whatToExpect
 	global lcdMessage
 	global userID
 	global deviceID
-	print 5
 	data = databaseQueryOne("SELECT count(*) FROM users WHERE ID = ?", [rfid,])
-	print 'deviceID = ' + deviceID
 	if data[0]==0:
-		print 6
 		LCDPrint("This is not a known user tag, contact an admin")
 		whatToExpect = 0
 	else:
-		print 7
 		data = databaseQueryOne("SELECT users_id FROM leases WHERE devices_id = ?",[deviceID])
-		if (data is None) or (len(data) == 0):
-			print 8
-			databaseQueryOne("DELETE FROM leases WHERE devices_id = ? AND users_id = ?",[deviceID, rfid])
+		print data
+		if (data is None) or (len(data) == 0) or data[0] == 0:
+			LCDPrint("This device was not checked out")
+		elif data[0] == rfid:
+			print "leases1 " + deviceID
+			print "leases2 " + rfid
+			databaseQueryOne("DELETE FROM leases WHERE devices_id == ? AND users_id == ?",[deviceID, rfid])
 			LCDPrint("The device is back, thank you.")
-			whatToExpect = 0
-		else:
-			print 9
+		else :
 			data = databaseQueryOne("SELECT users.firstname FROM users,leases WHERE leases.devices_id == ? AND users.id == leases.users_id",[deviceID])
 			LCDPrint("This device was not from you " + data[1])
 	tag = 0
+	whatToExpect = 0
+	lcdMessage = "Please scan your id or a device"
+	sleep(2)
 
 def scanShouldBeDevice (rfid):
 	global whatToExpect
@@ -102,8 +102,8 @@ def scanShouldBeDevice (rfid):
 		sleep(1)
 	else:
 		data = databaseQueryOne("SELECT users_id FROM leases WHERE devices_id = ?",[rfid])
-		if (data is None) or (len(data) == 0):
-			databaseQueryOne("insert or replace INTO leases VALUES(?,?,?)",[rfid, userID, datetime.now()])
+		if (data is None) or (data[0] == 0):
+			databaseQueryOne("insert or replace INTO leases(users_id, devices_id, lastchange) VALUES(?,?,?)",[userID, rfid, datetime.now()])
 			LCDPrint("HAPPY TESTING!")
 			sleep(1)
 		else:
@@ -113,6 +113,7 @@ def scanShouldBeDevice (rfid):
 	tag = 0
 	whatToExpect = 0
 	lcdMessage = "Please scan your id or a device"
+	sleep(1)
 
 
 def LCDPrint(data):
@@ -138,8 +139,6 @@ def scroll(data):
 lcdMessage = "Please scan your id or a device"
 while True:
 	tag = ser.read(12)
-	print "whatToExpect"
-	print whatToExpect
 	if (len(tag) == 0):
 		LCDPrint(lcdMessage)
 		continue
@@ -158,5 +157,5 @@ while True:
 		#lcdMessage = nextValues[1]
 		LCDPrint('Remove tag from reader!')
 		while len(tag) !=0:
-			tag = ser.read(1)
+			tag = ser.read(10)
 		sleep(1)
